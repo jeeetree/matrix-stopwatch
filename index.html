@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stopwatch</title>
+<style>
+  :root {
+    --page: #3a3933;
+    --phosphor: #8cff9e;
+    --phosphor-dim: #4a9a57;
+    --glow: 0 0 2px rgba(140, 255, 158, .85), 0 0 10px rgba(140, 255, 158, .45);
+    --font: "Lucida Console", "Monaco", "Courier New", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: radial-gradient(ellipse at 50% 45%, #4a4840 0%, var(--page) 75%);
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    font-family: var(--font);
+  }
+
+  /* ---- bulging CRT glass ---- */
+  .screen {
+    position: relative;
+    width: min(94vw, calc((100vh - 32px) * 4 / 3), 1100px);
+    aspect-ratio: 4 / 3;
+    border-radius: 9% / 12%;
+    overflow: hidden;
+    /* unlit tube glass is a smoky green-grey, brightest where the phosphor glows */
+    background:
+      radial-gradient(ellipse 45% 35% at 50% 50%, rgba(140,255,158,.06), transparent 70%),
+      radial-gradient(ellipse 80% 80% at 50% 46%, #1a2620 0%, #121b16 40%, #0a100c 75%, #050806 100%);
+    color: var(--phosphor);
+    text-shadow: var(--glow);
+    padding: 8% 10%;
+    box-shadow:
+      /* rubber gasket the glass sits in */
+      0 0 0 3px #0e0f0d,
+      0 0 0 5px #1d1e1b,
+      0 0 0 6px rgba(255,255,255,.05),
+      0 24px 50px rgba(0,0,0,.5),
+      /* light catching the rolled top edge, faint bounce on the bottom edge */
+      inset 0 2px 1px rgba(255,255,255,.10),
+      inset 0 -2px 2px rgba(255,255,255,.04),
+      /* glass curving away at the edges */
+      inset 0 0 70px 24px rgba(0,0,0,.7),
+      inset 0 0 14px 5px rgba(0,0,0,.85);
+    animation: flicker 7s infinite;
+  }
+
+  /* domed sheen: a soft lit cap across the top half sells the bulge */
+  .glare {
+    position: absolute;
+    /* hugs the screen: same top corners as the frame, gently curved lower edge */
+    left: 1.2%;
+    right: 1.2%;
+    top: 1.2%;
+    height: 40%;
+    border-radius: 9% 9% 50% 50% / 30% 30% 18% 18%;
+    pointer-events: none;
+    z-index: 4;
+    /* glossy cap with a visible lower edge, like light on a glass dome */
+    background: linear-gradient(180deg,
+      rgba(255,255,255,.17) 0%,
+      rgba(255,255,255,.08) 18%,
+      rgba(255,255,255,.045) 45%,
+      rgba(255,255,255,.035) 85%,
+      transparent 100%);
+    filter: blur(1px);
+  }
+  /* soft window reflection, top-left */
+  .hotspot {
+    position: absolute;
+    left: 12%;
+    top: 9%;
+    width: 22%;
+    height: 11%;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 4;
+    transform: rotate(-14deg);
+    background: radial-gradient(ellipse at center, rgba(255,255,255,.26), rgba(255,255,255,.08) 50%, transparent 75%);
+    filter: blur(4px);
+  }
+  /* faint reflected light hugging the bottom curve */
+  .bounce {
+    position: absolute;
+    left: 1.2%;
+    right: 1.2%;
+    bottom: 1.2%;
+    height: 18%;
+    border-radius: 50% 50% 9% 9% / 30% 30% 66% 66%;
+    pointer-events: none;
+    z-index: 4;
+    background: linear-gradient(0deg, rgba(255,255,255,.07), transparent 60%);
+    filter: blur(3px);
+  }
+  .screen::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+    background: repeating-linear-gradient(to bottom, rgba(0,0,0,.25) 0 1px, transparent 1px 3px);
+    border-radius: inherit;
+  }
+  .screen::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+    border-radius: inherit;
+    background:
+      radial-gradient(ellipse 110% 105% at 50% 50%, transparent 52%, rgba(0,0,0,.5) 82%, rgba(0,0,0,.85) 100%);
+  }
+  @keyframes flicker {
+    0%, 95%, 100% { opacity: 1; }
+    96% { opacity: .94; }
+  }
+
+  .content {
+    position: relative;
+    z-index: 1;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---- top line ---- */
+  .msg {
+    font-size: clamp(14px, 2.4vw, 22px);
+    min-height: 1.4em;
+    white-space: nowrap;
+  }
+  .cursor {
+    display: inline-block;
+    width: .6em;
+    height: 1em;
+    margin-left: .1em;
+    vertical-align: -.12em;
+    background: var(--phosphor);
+    box-shadow: var(--glow);
+    animation: blink 1.05s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ---- centered timer ---- */
+  .center {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .time {
+    font-size: clamp(36px, 9.5vw, 100px);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .04em;
+    white-space: nowrap;
+  }
+  .controls {
+    display: flex;
+    gap: 2.5em;
+    margin-top: 1em;
+    font-size: clamp(14px, 2.6vw, 24px);
+  }
+  button {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    text-shadow: inherit;
+    cursor: pointer;
+  }
+  /* "[ start ]" brackets light up on hover */
+  /* brackets are always there (so nothing shifts) but invisible until hover */
+  button::before { content: "[ "; color: transparent; text-shadow: none; }
+  button::after  { content: " ]"; color: transparent; text-shadow: none; }
+  button:hover:not(:disabled)::before,
+  button:hover:not(:disabled)::after,
+  button:focus-visible::before,
+  button:focus-visible::after { color: var(--phosphor); text-shadow: var(--glow); }
+  button:focus { outline: none; }
+  button:disabled { color: var(--phosphor-dim); text-shadow: none; cursor: default; opacity: .6; }
+
+  /* timer + buttons stay put; laps hang below without moving them */
+  .clock { position: relative; display: flex; flex-direction: column; align-items: center; }
+  ol {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    list-style: none;
+    margin: 1.4em 0 0;
+    padding: 0;
+    max-height: 7.5em;
+    overflow-y: auto;
+    font-size: clamp(11px, 1.9vw, 17px);
+    line-height: 1.5;
+    color: var(--phosphor-dim);
+    text-shadow: none;
+    scrollbar-width: none;
+    text-align: center;
+  }
+  ol::-webkit-scrollbar { display: none; }
+  li { font-variant-numeric: tabular-nums; }
+  li span { color: var(--phosphor); text-shadow: var(--glow); margin-left: 1em; }
+</style>
+</head>
+<body>
+  <div class="screen">
+    <div class="content">
+      <div class="msg"><span id="msg"></span><span class="cursor"></span></div>
+      <div class="center">
+        <div class="clock">
+        <div class="time" id="display">00:00.00</div>
+        <div class="controls">
+          <button id="startStop">start</button>
+          <button id="lapReset" disabled>lap</button>
+        </div>
+        <ol id="laps"></ol>
+        </div>
+      </div>
+    </div>
+    <div class="glare"></div>
+    <div class="hotspot"></div>
+    <div class="bounce"></div>
+  </div>
+
+<script>
+  const display = document.getElementById('display');
+  const startStopBtn = document.getElementById('startStop');
+  const lapResetBtn = document.getElementById('lapReset');
+  const lapsList = document.getElementById('laps');
+  const msgEl = document.getElementById('msg');
+
+  let running = false;
+  let startTime = 0;
+  let elapsed = 0;
+  let laps = [];
+  let lastLapTotal = 0;
+
+  const now = () => elapsed + (running ? performance.now() - startTime : 0);
+
+  function format(ms) {
+    const cs = Math.floor(ms / 10) % 100;
+    const s = Math.floor(ms / 1000) % 60;
+    const m = Math.floor(ms / 60000) % 60;
+    const h = Math.floor(ms / 3600000);
+    const pad = n => String(n).padStart(2, '0');
+    return (h ? h + ':' + pad(m) : pad(m)) + ':' + pad(s) + '.' + pad(cs);
+  }
+
+  // type the top line out letter by letter
+  function type(text, i = 0) {
+    if (i > text.length) return;
+    msgEl.textContent = text.slice(0, i);
+    setTimeout(() => type(text, i + 1), 70 + Math.random() * 90);
+  }
+
+  function tick() {
+    display.textContent = format(now());
+    if (running) requestAnimationFrame(tick);
+  }
+
+  function renderLaps() {
+    lapsList.innerHTML = laps
+      .map((t, i) => `<li>lap ${i + 1}<span>${format(t)}</span></li>`)
+      .reverse()
+      .join('');
+  }
+
+  function updateButtons() {
+    startStopBtn.textContent = running ? 'stop' : 'start';
+    lapResetBtn.textContent = running || elapsed === 0 ? 'lap' : 'reset';
+    lapResetBtn.disabled = !running && elapsed === 0;
+  }
+
+  function startStop() {
+    if (running) {
+      elapsed = now();
+      running = false;
+    } else {
+      startTime = performance.now();
+      running = true;
+    }
+    tick();
+    updateButtons();
+  }
+
+  function lap() {
+    if (!running) return;
+    const total = now();
+    laps.push(total - lastLapTotal);
+    lastLapTotal = total;
+    renderLaps();
+  }
+
+  function reset() {
+    if (running) return;
+    elapsed = 0; laps = []; lastLapTotal = 0;
+    renderLaps(); tick(); updateButtons();
+  }
+
+  startStopBtn.addEventListener('click', startStop);
+  lapResetBtn.addEventListener('click', () => (running ? lap() : reset()));
+
+  document.addEventListener('keydown', e => {
+    if (e.repeat) return;
+    if (e.code === 'Space') { e.preventDefault(); startStop(); }
+    else if (e.key === 'l' || e.key === 'L') lap();
+    else if (e.key === 'r' || e.key === 'R') reset();
+  });
+
+  setTimeout(() => type('Wake up, Neo...'), 600);
+</script>
+</body>
+</html>
